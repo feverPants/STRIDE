@@ -1,0 +1,485 @@
+<script type="module">
+// Import script for GoogleSheet Commit Commits
+const scriptURL = 'https://script.google.com/macros/s/AKfycbyOK0TPpU5caJrWHjIZYJaEjaaPu6cs2DDzuNlmVqqTSOlkbhhB6bCv0amPdBEYdK_xuQ/exec';
+
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+import { getDatabase, ref, child, onValue, get, push, update } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyBOnCmXw6Od5RMfRpkeDbB8QBngc6JnaeU",
+    authDomain: "stride-1e3b4.firebaseapp.com",
+    databaseURL: "https://stride-1e3b4-default-rtdb.firebaseio.com",
+    projectId: "stride-1e3b4",
+    storageBucket: "stride-1e3b4.appspot.com",
+    messagingSenderId: "700324883364",
+    appId: "1:700324883364:web:2fef20b656224be3ac6f31"
+
+    };
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const app2 = initializeApp({ databaseURL: "https://stride-1e3b4-default-rtdb.firebaseio.com" }, 'app2');
+
+// initialize firebase
+firebase.initializeApp(firebaseConfig);
+
+const dbCommits = getDatabase(app); // Commitment Database
+const dbTasks = getDatabase(app2); // Task Database
+
+// Reference your databases
+var superCommitsDB = firebase.database().ref('JudyCommits')
+var superTasksDB = firebase.database().ref('JudyTasks')
+
+
+        // Functin to update task
+        function updateTask(){
+            const taskValue = document.getElementById("new-task-input").value;
+            firebase.database().ref("JudyTasks/"+task.value).update({
+            task : taskValue,
+            })
+            console.log(taskValue);
+        };
+// Form info
+const commitmentForm = document.querySelector('#new-commitment-form');
+const commitmentInput = document.querySelector('#new-commitment-input');
+const submitButton = document.querySelector("#submit");
+
+const taskForm = document.querySelector('#new-task-form');
+const taskInput = document.querySelector('#new-task-input');
+
+
+
+// Creates the commitment element on the page
+function createCommitElement(commitData) {
+    const commitEl = document.createElement('div');
+    commitEl.classList.add('commit');
+    commitEl.setAttribute('data-key', commitData.key); // Store the unique key as a data attribute
+
+    const commitContentEl = document.createElement('div');
+    commitContentEl.classList.add('content');
+
+    const commitHeaderEl = document.createElement('div');
+    commitHeaderEl.classList.add('commit-header');
+
+    const commitNameEl = document.createElement('div');
+    commitNameEl.classList.add('commit-name');
+    commitNameEl.innerText = commitData.task;
+
+
+    const commitInfoEl = document.createElement('div');
+    commitInfoEl.classList.add('info','placeholder-style');
+    commitInfoEl.style.display = 'none';
+
+
+    const commitDetailsEl = document.createElement('div');
+    commitDetailsEl.classList.add('commit-details', 'placeholder-style');
+    commitDetailsEl.style.display = 'none';
+    commitDetailsEl.innerHTML = `
+        <div class="info">
+            <div>Location: ${commitData.location}</div>
+            <div>Date: ${commitData.date}</div>
+            <div>Time: ${commitData.startTime} - ${commitData.endTime}</div>
+        </div>
+    `;
+
+
+
+    commitHeaderEl.appendChild(commitNameEl);
+
+    commitEl.appendChild(commitContentEl);
+    commitEl.appendChild(commitNameEl);
+    // commitEl.appendChild(commitActionsEl);
+    commitEl.appendChild(commitDetailsEl);
+    
+
+
+
+
+    commitEl.addEventListener('mouseover', () => {
+    commitDetailsEl.style.display = 'block';
+        });
+
+    commitEl.addEventListener('mouseleave', () => {
+    commitDetailsEl.style.display = 'none';
+        });
+
+    console.log(commitData.key);
+
+    const deleteButton = document.createElement('button');
+    deleteButton.textContent = 'Delete';
+    deleteButton.classList.add('delete');
+    deleteButton.addEventListener('click', () => deleteItem(commitData.key, 'commits'));
+
+    commitEl.appendChild(deleteButton);
+
+
+    return commitEl;
+
+}
+
+
+
+// Creates the task element on the page
+function createTaskElement(taskData) {
+    const taskEl = document.createElement('div');
+    taskEl.classList.add('task');
+    taskEl.setAttribute('data-key', taskData.key); // Store the unique key as a data attribute
+
+    const taskNameEl = document.createElement('div');
+    taskNameEl.classList.add('task-name');
+    taskNameEl.innerText = taskData.task;
+
+
+    taskEl.classList.add('taks-horizontal');
+
+    const editButton = document.createElement('button');
+    editButton.textContent = 'Edit';
+    editButton.classList.add('edit');
+    editButton.addEventListener('click', () => toggleEditMode(taskEl));
+
+
+
+    const deleteButton = document.createElement('button');
+    deleteButton.textContent = 'Delete';
+    deleteButton.classList.add('delete');
+    deleteButton.addEventListener('click', () => deleteItem(taskData.key, 'tasks'));
+
+
+
+    taskEl.appendChild(taskNameEl);
+    taskEl.appendChild(editButton);
+    taskEl.appendChild(deleteButton);
+    console.log(taskData.key);
+    return taskEl;
+}
+
+
+    // Helper function to format date as MMM-DD-YYYY in modal box
+    const formatDate = (date) => {
+    const year = date.getFullYear();
+    const month = date.toLocaleString('default', { month: 'short' });
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${month}-${day}-${year}`;
+    };
+
+            //Function to recieve remaining commitment input. It then pushes it to the current array as well as sends to firebase.  Array is supposed to be sent to gsheets.
+        const openCommitmentModal = () => {
+        const modal = document.createElement('div');
+        modal.classList.add('modal');
+
+        const modalContent = document.createElement('div');
+        modalContent.classList.add('modal-content');
+
+        const locationInput = document.createElement('input');
+        locationInput.type = 'text';
+        locationInput.placeholder = 'Location';
+        locationInput.required = true;
+
+        const dateInput = document.createElement('input');
+        dateInput.type = 'text';
+        dateInput.id = 'date-input';
+        dateInput.placeholder = 'Date';
+        dateInput.required = true;
+
+        const calendarIcon = document.createElement('i');
+        calendarIcon.classList.add('far', 'fa-calendar-alt');
+        calendarIcon.addEventListener('click', () => {
+            flatpickrInstance.open();
+        });
+
+        const startTimeHourSelect = document.createElement('select');
+        for (let i = 7; i < 19; i++) {
+            const option = document.createElement('option');
+            option.value = i.toString().padStart(2, '0');
+            option.textContent = i.toString().padStart(2, '0');
+            startTimeHourSelect.appendChild(option);
+        }
+
+        const startTimeMinuteSelect = document.createElement('select');
+        for (let i = 0; i < 60; i++) {
+            const option = document.createElement('option');
+            option.value = i.toString().padStart(2, '0');
+            option.textContent = i.toString().padStart(2, '0');
+            startTimeMinuteSelect.appendChild(option);
+            i = i+4;
+        }
+
+        const endTimeHourSelect = document.createElement('select');
+        for (let i = 7; i < 19; i++) {
+            const option = document.createElement('option');
+            option.value = i.toString().padStart(2, '0');
+            option.textContent = i.toString().padStart(2, '0');
+            endTimeHourSelect.appendChild(option);
+        }
+
+        const endTimeMinuteSelect = document.createElement('select');
+        for (let i = 0; i < 60; i++) {
+            const option = document.createElement('option');
+            option.value = i.toString().padStart(2, '0');
+            option.textContent = i.toString().padStart(2, '0');
+            endTimeMinuteSelect.appendChild(option);
+            i = i+4;
+        }
+
+        const saveButton = document.createElement('button');
+        saveButton.innerText = 'Save';
+
+        const cancelButton = document.createElement('button');
+        cancelButton.innerText = 'Cancel';
+
+        modalContent.appendChild(locationInput);
+        modalContent.appendChild(document.createTextNode(' '));
+        modalContent.appendChild(dateInput);
+        modalContent.appendChild(calendarIcon);
+        modalContent.appendChild(document.createElement('br'));
+        modalContent.appendChild(startTimeHourSelect);
+        modalContent.appendChild(document.createTextNode(':'));
+        modalContent.appendChild(startTimeMinuteSelect);
+        modalContent.appendChild(document.createTextNode('  to  '));
+        modalContent.appendChild(endTimeHourSelect);
+        modalContent.appendChild(document.createTextNode(':'));
+        modalContent.appendChild(endTimeMinuteSelect);
+        modalContent.appendChild(saveButton);
+        modalContent.appendChild(cancelButton);
+
+        modal.appendChild(modalContent);
+        document.body.appendChild(modal);
+
+        modal.classList.add('modal-top');
+
+        locationInput.focus();
+
+        const flatpickrInstance = flatpickr(dateInput, {
+            dateFormat: 'Y-m-d',
+        });
+
+    const saveCommitModal = () => {
+        const newCommit = commitmentInput.value.trim();
+        const location = locationInput.value.trim();
+        const selectedDate = flatpickrInstance.selectedDates[0];
+        const date = selectedDate ? formatDate(selectedDate) : '';
+        const startTime = startTimeHourSelect.value + ':' + startTimeMinuteSelect.value;
+        const endTime = endTimeHourSelect.value + ':' + endTimeMinuteSelect.value;
+        const calStartDate = date +' ' + startTime;
+        const calEndDate = date + ' ' + endTime;
+        closeModal();
+
+
+        let requestBody = new FormData()
+        requestBody.append("task", newCommit);
+        requestBody.append("location", location);
+        requestBody.append("date", date);
+        requestBody.append("startTime", calStartDate);
+        requestBody.append("endTime", calEndDate);
+
+            fetch(scriptURL, { method: 'POST', body: requestBody})
+            // .then(response => {
+            //     alert('Success!', response)
+            //     submitButton.disabled = false
+            //     })
+            .catch(error => {
+            alert('Error!', error.message)
+                submitButton.disabled = false
+
+            }
+            )
+
+        //push saved commitment items to the firebase array
+        saveCommitInput(newCommit, location, date, startTime, endTime);
+        commitmentInput.value = '';
+
+    };
+
+    saveButton.addEventListener('click', saveCommitModal);
+
+    cancelButton.addEventListener('click', () => {
+        closeModal();
+    });
+
+    const closeModal = () => {
+        saveButton.removeEventListener('click', saveCommitModal);
+        document.body.removeChild(modal);
+    };
+
+
+
+    };
+
+// Iterates through list of commits and tasks to create a new element for each item on their respective list
+function renderCommits(commits) {
+    const commitsContainer = document.getElementById('commits');
+    commitsContainer.innerHTML = '';
+
+    commits.forEach(commitData => {
+        const commitEl = createCommitElement(commitData);
+        commitsContainer.appendChild(commitEl);
+    });
+}
+
+function renderTasks(tasks) {
+    const tasksContainer = document.getElementById('tasks');
+    tasksContainer.innerHTML = '';
+
+    tasks.forEach(taskData => {
+        const taskEl = createTaskElement(taskData);
+        tasksContainer.appendChild(taskEl);
+        taskEl.querySelector('.task-name').contentEditable = false;
+    });
+}
+
+
+
+
+// Pull Realtime updates to Commits List
+function getSuperCommitsRealtime() {
+    const dbRef = ref(dbCommits, "JudyCommits");
+
+    onValue(dbRef, (snapshot) => {
+        const commits = [];
+        snapshot.forEach(childSnapshot => {
+            commits.push(childSnapshot.val());
+        });
+
+        renderCommits(commits);
+    });
+}
+
+// Pull Realtime updates to Tasks List
+function getSuperTasksRealtime() {
+    const dbRef = ref(dbTasks, "JudyTasks");
+
+    onValue(dbRef, (snapshot) => {
+        const tasks = [];
+        snapshot.forEach(childSnapshot => {
+            tasks.push(childSnapshot.val());
+        });
+
+        renderTasks(tasks);
+    });
+}
+
+//Pulls Real-time Info from both Tasks and Commits DB's and implements the mouseover information for the commit's list
+function updateDBItems(){
+    getSuperCommitsRealtime();
+    getSuperTasksRealtime();
+
+    const commitElements = document.querySelectorAll('.commit');
+    commitElements.forEach(commitElement => {
+    const commitDetails = commitElement.querySelector('.commit-details');
+
+    commitElement.addEventListener('mouseover', () => {
+    commitDetails.style.display = 'block';
+    });
+
+    commitElement.addEventListener('mouseleave', () => {
+    commitDetails.style.display = 'none';
+    });
+});
+}
+
+
+
+// Function to Delete an item
+// function editTask(taskDataJSON) {
+//     const taskData = JSON.parse(taskDataJSON);
+//     firebase.database().ref("superCommitsDB/"+taskData.task).update({
+//         task : taskData.task
+//     });
+// };
+// taskDeleteButton.addEventListener('click', () => {
+//         listElement.removeChild(taskElement);
+//     });
+
+// function deleteTask(taskData) {
+//     let userRef = this.database.ref('superTasksDB/'+taskData.task);
+//     userRef.remove();
+// };
+
+function deleteItem(key, type) {
+    // if (confirm('Are you sure you want to delete this item?')) {
+        const dbRef = type === 'commits' ? superCommitsDB : superTasksDB;
+        dbRef.child(key).remove();
+    // }
+}
+
+function toggleEditMode(taskElement) {
+    const editButton = taskElement.querySelector('.edit');
+    const taskNameEl = taskElement.querySelector('.task-name');
+
+    if (editButton.textContent === 'Edit') {
+        editButton.textContent = 'Save';
+        taskNameEl.contentEditable = true;
+        taskNameEl.focus();
+    } else {
+        editButton.textContent = 'Edit';
+        taskNameEl.contentEditable = false;
+        saveTaskEdit(taskElement);
+    }
+}
+
+function saveTaskEdit(taskElement) {
+    const taskNameEl = taskElement.querySelector('.task-name');
+    const newTaskValue = taskNameEl.textContent.trim();
+    const taskKey = taskElement.getAttribute('data-key');
+
+    if (newTaskValue !== '') {
+        // Update the task content in the Firebase database
+        const dbRef = superTasksDB.child(taskKey);
+        dbRef.update({
+            task: newTaskValue
+        });
+    }
+}
+
+// Pushes to DB
+const saveCommitInput = (newCommit, location, date, startTime, endTime) => {
+    var newCommitInput = superCommitsDB.push();
+    var commitKey = newCommitInput.key;
+
+    newCommitInput.set({
+        key : commitKey,
+        task : newCommit,
+        location : location,
+        date : date,
+        startTime : startTime,
+        endTime : endTime,
+    });
+};
+// Pushes to DB
+const saveTaskInput = (newTask) => {
+    var newTaskInput = superTasksDB.push();
+    var taskKey = newTaskInput.key;
+
+    console.log(taskKey);
+    newTaskInput.set({
+        key : taskKey,
+        task : newTask
+    });
+};
+
+// Listens for an entered commitment
+commitmentForm.addEventListener('submit', (e) => {
+        //submitButton.disabled = true
+        e.preventDefault();
+        openCommitmentModal();
+
+
+    });
+
+// Listens for an entered task
+taskForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const task = taskInput.value.trim();
+        if (task !== '') {
+            saveTaskInput(task);
+            taskInput.value = '';
+        }
+    });
+
+
+// Loads both DB lists to populate when loading page
+window.onload = updateDBItems;
+
+</script>
